@@ -154,7 +154,7 @@ async function worker_0_5_generate_thumbnail(data, titleText, outputImagePath) {
 // ==========================================
 
 // ==========================================
-// 🎥 WORKER 1 & 2: CAPTURE & FAST EDIT (SAFE MODE)
+// 🎥 WORKER 1 & 2: CAPTURE & FAST EDIT (SAFE MODE + EVEN PIXEL FIX)
 // ==========================================
 async function worker_1_2_capture_and_edit(data, outputVid) {
     console.log(`\n[🎬 Worker 1 & 2] Stream capture, Heavy Blur aur PiP Frame shuru ho raha hai...`);
@@ -168,31 +168,31 @@ async function worker_1_2_capture_and_edit(data, outputVid) {
     const hasBg = fs.existsSync(bgImage);
     const hasAudio = fs.existsSync(audioFile);
 
-    // 🛡️ NAYA TAREEQA: Array based arguments (String breaks se bachne ke liye)
+    // 🛠️ FIX: Thread queue warning ko khatam karne ke liye
     let args = [
         "-y", 
+        "-thread_queue_size", "1024",
         "-headers", headersCmd, 
         "-i", data.url
     ];
 
     if (hasBg) {
         console.log(`[>] Background Frame '${bgImage}' mil gaya! PiP mode on.`);
-        // 🛠️ FIX: Image loop ke sath framerate dena lazmi hai warna FFmpeg atak jata hai
-        args.push("-loop", "1", "-framerate", "30", "-i", bgImage);
+        args.push("-thread_queue_size", "1024", "-loop", "1", "-framerate", "30", "-i", bgImage);
     } else {
         console.log(`[⚠️] Background Frame nahi mila. Normal mode mein chala raha hoon.`);
     }
 
     if (hasAudio) {
         console.log(`[>] Custom audio mil gaya. Original awaaz mute ki ja rahi hai.`);
-        args.push("-stream_loop", "-1", "-i", audioFile);
+        args.push("-thread_queue_size", "1024", "-stream_loop", "-1", "-i", audioFile);
     }
 
     let filterComplex = "";
     
     if (hasBg) {
-        // 🛠️ FIX: format=yuv420p lagaya taake FB par hamesha play ho
-        filterComplex += `[0:v]scale=1064:565,boxblur=${blurAmount}[pip]; [1:v][pip]overlay=0:250:shortest=1,format=yuv420p[outv]`;
+        // 🛠️ FIX: libx264 "Not divisible by 2" Error Fix (trunc scale use kiya hai)
+        filterComplex += `[0:v]scale=1064:565,boxblur=${blurAmount}[pip]; [1:v][pip]overlay=0:250:shortest=1,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[outv]`;
     } else {
         filterComplex += `[0:v]scale=1280:720,boxblur=${blurAmount},format=yuv420p[outv]`;
     }
@@ -207,7 +207,6 @@ async function worker_1_2_capture_and_edit(data, outputVid) {
         args.push("-map", "0:a:0");
     }
 
-    // Encoding Settings
     args.push(
         "-c:v", "libx264", 
         "-preset", "ultrafast", 
@@ -218,19 +217,22 @@ async function worker_1_2_capture_and_edit(data, outputVid) {
     );
 
     try {
-        console.log(`[>] Executing FFmpeg Fast-Edit PiP Engine (Safe Array Mode)...`);
-        
-        // spawnSync array of arguments leta hai, is liye spaces aur next-lines ( \r\n ) safely process hoty hain
+        console.log(`[>] Executing FFmpeg Fast-Edit PiP Engine...`);
         const result = spawnSync('ffmpeg', args, { stdio: 'pipe' });
         
-        // 📸 Agar internal FFmpeg error aata hai toh console par print karega
         if (result.status !== 0) {
             console.log(`[❌] FFmpeg Internal Error Details:\n${result.stderr.toString()}`);
         }
 
+        // 🛠️ FIX: Sirf file mojood hona kafi nahi, file size bhi 0 byte se zyada hona chahiye
         if (fs.existsSync(outputVid)) {
-            console.log(`[✅ Worker 1 & 2] Video Edit, Frame aur Blur ke sath save ho gayi: ${outputVid}`);
-            return true;
+            const stats = fs.statSync(outputVid);
+            if (stats.size > 1000) { // Agar 1KB se badi hai file
+                console.log(`[✅ Worker 1 & 2] Video Edit, Frame aur Blur ke sath save ho gayi: ${outputVid}`);
+                return true;
+            } else {
+                console.log(`[❌ Worker 1 & 2] Video file ban toh gayi lekin empty (0 bytes) hai. FFmpeg Crash!`);
+            }
         }
     } catch (e) { 
         console.log(`[❌ Worker 1 & 2] FFmpeg processing code crash ho gaya!`); 
