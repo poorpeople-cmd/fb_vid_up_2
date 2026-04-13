@@ -8,7 +8,6 @@ on:
         required: true
         type: choice
         options:
-          - 'Dual'
           - 'Token1'
           - 'Token2'
         default: 'Dual'
