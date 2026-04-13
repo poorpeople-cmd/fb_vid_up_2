@@ -1,6 +1,7 @@
 
 const puppeteer = require('puppeteer');
-const { spawn, execSync } = require('child_process');
+// const { spawn, execSync } = require('child_process');
+const { spawnSync, execSync } = require('child_process');
 const fs = require('fs');
 const FormData = require('form-data');
 const axios = require('axios'); 
@@ -153,76 +154,88 @@ async function worker_0_5_generate_thumbnail(data, titleText, outputImagePath) {
 // ==========================================
 
 // ==========================================
-// 🎥 WORKER 1 & 2: CAPTURE & FAST EDIT (WITH PiP & HEAVY BLUR)
+// 🎥 WORKER 1 & 2: CAPTURE & FAST EDIT (SAFE MODE)
 // ==========================================
 async function worker_1_2_capture_and_edit(data, outputVid) {
     console.log(`\n[🎬 Worker 1 & 2] Stream capture, Heavy Blur aur PiP Frame shuru ho raha hai...`);
     const headersCmd = `User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\nReferer: ${data.referer}\r\nCookie: ${data.cookie}\r\n`;
     
     const audioFile = "marya_live.mp3";
-    const bgImage = "website_frame.png"; // 🎯 NAYA: Background Frame Image
-    const duration = 10; 
-    
-    // 🎯 NAYA: Blur level barha diya gaya hai (Pehle 10 tha, ab 20 hai)
+    const bgImage = "website_frame.png";
+    const duration = "10"; 
     const blurAmount = "20:5"; 
 
     const hasBg = fs.existsSync(bgImage);
     const hasAudio = fs.existsSync(audioFile);
 
-    // FFmpeg Base Command
-    let ffmpegCmd = `ffmpeg -y -headers "${headersCmd}" -i "${data.url}"`;
-    
-    // Inputs add karna
+    // 🛡️ NAYA TAREEQA: Array based arguments (String breaks se bachne ke liye)
+    let args = [
+        "-y", 
+        "-headers", headersCmd, 
+        "-i", data.url
+    ];
+
     if (hasBg) {
         console.log(`[>] Background Frame '${bgImage}' mil gaya! PiP mode on.`);
-        ffmpegCmd += ` -loop 1 -i "${bgImage}"`;
+        // 🛠️ FIX: Image loop ke sath framerate dena lazmi hai warna FFmpeg atak jata hai
+        args.push("-loop", "1", "-framerate", "30", "-i", bgImage);
     } else {
         console.log(`[⚠️] Background Frame nahi mila. Normal mode mein chala raha hoon.`);
     }
 
     if (hasAudio) {
         console.log(`[>] Custom audio mil gaya. Original awaaz mute ki ja rahi hai.`);
-        ffmpegCmd += ` -stream_loop -1 -i "${audioFile}"`;
+        args.push("-stream_loop", "-1", "-i", audioFile);
     }
 
-    // Filter aur Mapping Logic (Khatarnak FFmpeg Engine)
     let filterComplex = "";
-    let mapVideo = "";
-    let mapAudio = "";
-
+    
     if (hasBg) {
-        // Live video ko resize aur blur karo, phir Frame ke upar chipka do (Coordinates from your Python code)
-        filterComplex += `[0:v]scale=1064:565,boxblur=${blurAmount}[pip]; [1:v][pip]overlay=0:250:shortest=1[outv]`;
-        mapVideo = `-map "[outv]"`;
+        // 🛠️ FIX: format=yuv420p lagaya taake FB par hamesha play ho
+        filterComplex += `[0:v]scale=1064:565,boxblur=${blurAmount}[pip]; [1:v][pip]overlay=0:250:shortest=1,format=yuv420p[outv]`;
     } else {
-        // Sirf blur aur 720p resize karo
-        filterComplex += `[0:v]scale=1280:720,boxblur=${blurAmount}[outv]`;
-        mapVideo = `-map "[outv]"`;
+        filterComplex += `[0:v]scale=1280:720,boxblur=${blurAmount},format=yuv420p[outv]`;
     }
+
+    args.push("-filter_complex", filterComplex);
+    args.push("-map", "[outv]");
 
     if (hasAudio) {
-        // Agar Frame bhi hai toh Audio 3rd input [2:a] hoga, warna 2nd input [1:a] hoga
         let audioIndex = hasBg ? 2 : 1;
-        mapAudio = `-map ${audioIndex}:a:0`;
+        args.push("-map", `${audioIndex}:a:0`);
     } else {
-        // Agar custom audio nahi hai toh original [0:a] use karo
-        mapAudio = `-map 0:a:0`; 
+        args.push("-map", "0:a:0");
     }
 
-    // Command Complete Karna
-    ffmpegCmd += ` -filter_complex "${filterComplex}" ${mapVideo} ${mapAudio} -c:v libx264 -preset ultrafast -c:a aac -b:a 128k -t ${duration} "${outputVid}"`;
+    // Encoding Settings
+    args.push(
+        "-c:v", "libx264", 
+        "-preset", "ultrafast", 
+        "-c:a", "aac", 
+        "-b:a", "128k", 
+        "-t", duration, 
+        outputVid
+    );
 
     try {
-        console.log(`[>] Executing FFmpeg Fast-Edit PiP Engine...`);
-        execSync(ffmpegCmd, { stdio: 'ignore' });
+        console.log(`[>] Executing FFmpeg Fast-Edit PiP Engine (Safe Array Mode)...`);
         
+        // spawnSync array of arguments leta hai, is liye spaces aur next-lines ( \r\n ) safely process hoty hain
+        const result = spawnSync('ffmpeg', args, { stdio: 'pipe' });
+        
+        // 📸 Agar internal FFmpeg error aata hai toh console par print karega
+        if (result.status !== 0) {
+            console.log(`[❌] FFmpeg Internal Error Details:\n${result.stderr.toString()}`);
+        }
+
         if (fs.existsSync(outputVid)) {
             console.log(`[✅ Worker 1 & 2] Video Edit, Frame aur Blur ke sath save ho gayi: ${outputVid}`);
             return true;
         }
     } catch (e) { 
-        console.log(`[❌ Worker 1 & 2] FFmpeg processing crash ho gayi! Command: ${ffmpegCmd}`); 
+        console.log(`[❌ Worker 1 & 2] FFmpeg processing code crash ho gaya!`); 
     }
+    
     return false;
 }
 
