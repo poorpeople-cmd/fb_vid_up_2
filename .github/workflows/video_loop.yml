@@ -40,12 +40,13 @@ jobs:
         node-version: '18'
 
     - name: Install Node Libraries
-      # Yahan Puppeteer aur FB Upload ke liye Axios aur Form-Data install kar rahe hain
       run: npm install puppeteer axios form-data
 
     - name: Start The Hybrid Bot
       env:
-        FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }} 
+        # NAYE DUAL TOKENS YAHAN HAIN
+        FB_TOKEN_1: ${{ secrets.FB_TOKEN_1 }}
+        FB_TOKEN_2: ${{ secrets.FB_TOKEN_2 }}
         GH_PAT: ${{ secrets.GH_PAT }}
         TITLES_LIST: ${{ inputs.titles_list }}
         DESCS_LIST: ${{ inputs.descs_list }}
@@ -53,5 +54,76 @@ jobs:
         TARGET_URL: ${{ inputs.target_url }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         GITHUB_REF_NAME: ${{ github.ref_name }}
-      # Xvfb fake display browser ko run karne ke liye zaroori hai
       run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" node video_bot.js
+
+
+
+
+
+
+
+
+
+
+
+# // ================== this work well, bas facebook api waley keys(primary and secondry fb token bol qaye thy ) woo oopper code mei fix karty hai =========================
+
+
+
+# name: Ultimate Hybrid Video Bot
+
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       titles_list:
+#         description: 'Titles Array (Separate with ,,)'
+#         required: true
+#         default: 'Delhi Capitals vs Gujarat Titans Live Match Today,,Blockbuster Match DC vs GT'
+#       descs_list:
+#         description: 'Descriptions Array (Separate with ,,)'
+#         required: true
+#         default: 'DC take on GT in the latest IPL match. Watch the live action here without buffer,,The best IPL teams DC and GT face off!'
+#       hashtags:
+#         description: 'Hashtags (Space separated)'
+#         required: true
+#         default: '#IPL2026 #DCvsGT #DelhiCapitals #GujaratTitans #IPLLive #LiveMatch'
+#       target_url:
+#         description: 'Target Website URL'
+#         required: true
+#         default: 'https://dadocric.st/player.php?id=starsp'
+
+# jobs:
+#   run-bot:
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 360 # 6 Hours Limit
+
+#     steps:
+#     - name: Checkout Code
+#       uses: actions/checkout@v3
+
+#     - name: Install System Tools (FFmpeg & Chrome)
+#       run: |
+#         sudo apt-get update
+#         sudo apt-get install -y ffmpeg google-chrome-stable xvfb
+
+#     - name: Setup Node.js
+#       uses: actions/setup-node@v3
+#       with:
+#         node-version: '18'
+
+#     - name: Install Node Libraries
+#       # Yahan Puppeteer aur FB Upload ke liye Axios aur Form-Data install kar rahe hain
+#       run: npm install puppeteer axios form-data
+
+#     - name: Start The Hybrid Bot
+#       env:
+#         FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }} 
+#         GH_PAT: ${{ secrets.GH_PAT }}
+#         TITLES_LIST: ${{ inputs.titles_list }}
+#         DESCS_LIST: ${{ inputs.descs_list }}
+#         HASHTAGS: ${{ inputs.hashtags }}
+#         TARGET_URL: ${{ inputs.target_url }}
+#         GITHUB_REPOSITORY: ${{ github.repository }}
+#         GITHUB_REF_NAME: ${{ github.ref_name }}
+#       # Xvfb fake display browser ko run karne ke liye zaroori hai
+#       run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" node video_bot.js
