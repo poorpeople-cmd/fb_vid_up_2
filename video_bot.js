@@ -166,79 +166,104 @@ async function worker_0_5_generate_thumbnail(data, titleText, outputImagePath) {
 // ==========================================
 // 🎥 WORKER 1 & 2: CAPTURE & FAST EDIT
 // ==========================================
+
+// ==========================================
+// 🎥 WORKER 1 & 2: CAPTURE, EDIT & MERGE (MAIN_VIDEO)
+// ==========================================
 async function worker_1_2_capture_and_edit(data, outputVid) {
-    console.log(`\n[🎬 Worker 1 & 2] Stream capture, Heavy Blur aur PiP Frame shuru ho raha hai...`);
+    console.log(`\n[🎬 Worker 1 & 2] Stream capture, PiP Frame aur Merging shuru ho rahi hai...`);
     const headersCmd = `User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\nReferer: ${data.referer}\r\nCookie: ${data.cookie}\r\n`;
     
     const audioFile = "marya_live.mp3";
     const bgImage = "website_frame.png";
+    const staticVideo = "main_video.mp4"; // 🎯 YEH RAHI AAPKI MAIN VIDEO
     const duration = "10"; 
     const blurAmount = "20:5"; 
 
     const hasBg = fs.existsSync(bgImage);
     const hasAudio = fs.existsSync(audioFile);
+    const hasMainVideo = fs.existsSync(staticVideo);
 
-    let args = [
-        "-y", 
-        "-thread_queue_size", "1024",
-        "-headers", headersCmd, 
-        "-i", data.url
+    const tempDynVideo = `temp_dyn_${Date.now()}.mp4`; // 10 second clip ke liye temporary file
+
+    // -----------------------------------------------------
+    // STEP A: 10 Second Ki Live Clip Banana (Blur + PiP)
+    // -----------------------------------------------------
+    console.log(`[>] Step A: 10 sec ki live clip tayyar kar raha hoon...`);
+    let args1 = [
+        "-y", "-thread_queue_size", "1024", "-headers", headersCmd, "-i", data.url
     ];
 
     if (hasBg) {
-        console.log(`[>] Background Frame '${bgImage}' mil gaya! PiP mode on.`);
-        args.push("-thread_queue_size", "1024", "-loop", "1", "-framerate", "30", "-i", bgImage);
-    } else {
-        console.log(`[⚠️] Background Frame nahi mila. Normal mode mein chala raha hoon.`);
+        args1.push("-thread_queue_size", "1024", "-loop", "1", "-framerate", "30", "-i", bgImage);
     }
-
     if (hasAudio) {
-        console.log(`[>] Custom audio mil gaya. Original awaaz mute ki ja rahi hai.`);
-        args.push("-thread_queue_size", "1024", "-stream_loop", "-1", "-i", audioFile);
+        args1.push("-thread_queue_size", "1024", "-stream_loop", "-1", "-i", audioFile);
     }
 
-    let filterComplex = "";
-    
+    let filterComplex1 = "";
     if (hasBg) {
-        filterComplex += `[0:v]scale=1064:565,boxblur=${blurAmount}[pip]; [1:v][pip]overlay=0:250:shortest=1,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[outv]`;
+        filterComplex1 += `[0:v]scale=1064:565,boxblur=${blurAmount}[pip]; [1:v][pip]overlay=0:250:shortest=1,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[outv]`;
     } else {
-        filterComplex += `[0:v]scale=1280:720,boxblur=${blurAmount},format=yuv420p[outv]`;
+        filterComplex1 += `[0:v]scale=1280:720,boxblur=${blurAmount},format=yuv420p[outv]`;
     }
 
-    args.push("-filter_complex", filterComplex);
-    args.push("-map", "[outv]");
+    args1.push("-filter_complex", filterComplex1, "-map", "[outv]");
 
     if (hasAudio) {
         let audioIndex = hasBg ? 2 : 1;
-        args.push("-map", `${audioIndex}:a:0`);
+        args1.push("-map", `${audioIndex}:a:0`);
     } else {
-        args.push("-map", "0:a:0");
+        args1.push("-map", "0:a:0");
     }
 
-    args.push(
-        "-c:v", "libx264", 
-        "-preset", "ultrafast", 
-        "-c:a", "aac", 
-        "-b:a", "128k", 
-        "-t", duration, 
-        outputVid
-    );
+    args1.push("-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-b:a", "128k", "-t", duration, tempDynVideo);
 
     try {
-        console.log(`[>] Executing FFmpeg Fast-Edit PiP Engine...`);
-        const result = spawnSync('ffmpeg', args, { stdio: 'pipe' });
-        
-        if (result.status !== 0) {
-            console.log(`[❌] FFmpeg Internal Error Details:\n${result.stderr.toString()}`);
-        }
+        const result1 = spawnSync('ffmpeg', args1, { stdio: 'pipe' });
+        if (result1.status !== 0) console.log(`[❌] Step A Error Details:\n${result1.stderr.toString()}`);
 
-        if (fs.existsSync(outputVid)) {
-            const stats = fs.statSync(outputVid);
-            if (stats.size > 1000) { 
-                console.log(`[✅ Worker 1 & 2] Video Edit, Frame aur Blur ke sath save ho gayi: ${outputVid}`);
-                return true;
+        if (fs.existsSync(tempDynVideo) && fs.statSync(tempDynVideo).size > 1000) {
+            console.log(`[✅] Step A Done! 10 sec ki clip ban gayi.`);
+            
+            // -----------------------------------------------------
+            // STEP B: Live Clip ko Main Video ke sath Jorna (Merge)
+            // -----------------------------------------------------
+            if (hasMainVideo) {
+                console.log(`[>] Step B: 'main_video.mp4' mil gayi! Ab dono ko aapas mein merge kar raha hoon...`);
+                
+                // NAYA TAREEQA: Dono videos ko forcefully 1280x720, 30fps aur stereo audio par set karke join karega
+                let args2 = [
+                    "-y",
+                    "-i", tempDynVideo,
+                    "-i", staticVideo,
+                    "-filter_complex",
+                    "[0:v]scale=1280:720,fps=30,format=yuv420p[v0]; [0:a]aformat=sample_rates=44100:channel_layouts=stereo[a0]; [1:v]scale=1280:720,fps=30,format=yuv420p[v1]; [1:a]aformat=sample_rates=44100:channel_layouts=stereo[a1]; [v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
+                    "-map", "[outv]",
+                    "-map", "[outa]",
+                    "-c:v", "libx264",
+                    "-preset", "ultrafast",
+                    "-c:a", "aac",
+                    "-b:a", "128k",
+                    outputVid
+                ];
+
+                const result2 = spawnSync('ffmpeg', args2, { stdio: 'pipe' });
+                if (result2.status !== 0) console.log(`[❌] Step B Error Details:\n${result2.stderr.toString()}`);
+                
+                fs.unlinkSync(tempDynVideo); // Temp file delete kar do
+
+                if (fs.existsSync(outputVid) && fs.statSync(outputVid).size > 1000) {
+                    console.log(`[✅ Worker 1 & 2] Merging SUCCESS! Final Video Ready: ${outputVid}`);
+                    return true;
+                } else {
+                    console.log(`[❌ Worker 1 & 2] Merging ke dauran file corrupt ho gayi.`);
+                }
+
             } else {
-                console.log(`[❌ Worker 1 & 2] Video file ban toh gayi lekin empty (0 bytes) hai. FFmpeg Crash!`);
+                console.log(`[⚠️] 'main_video.mp4' nahi mili! Sirf 10 sec ki clip ko hi final bana raha hoon.`);
+                fs.renameSync(tempDynVideo, outputVid); // Agar main video na ho toh 10 sec clip ko hi rename kar do
+                return true;
             }
         }
     } catch (e) { 
@@ -247,6 +272,93 @@ async function worker_1_2_capture_and_edit(data, outputVid) {
     
     return false;
 }
+
+
+
+
+
+
+// async function worker_1_2_capture_and_edit(data, outputVid) {
+//     console.log(`\n[🎬 Worker 1 & 2] Stream capture, Heavy Blur aur PiP Frame shuru ho raha hai...`);
+//     const headersCmd = `User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\nReferer: ${data.referer}\r\nCookie: ${data.cookie}\r\n`;
+    
+//     const audioFile = "marya_live.mp3";
+//     const bgImage = "website_frame.png";
+//     const duration = "10"; 
+//     const blurAmount = "20:5"; 
+
+//     const hasBg = fs.existsSync(bgImage);
+//     const hasAudio = fs.existsSync(audioFile);
+
+//     let args = [
+//         "-y", 
+//         "-thread_queue_size", "1024",
+//         "-headers", headersCmd, 
+//         "-i", data.url
+//     ];
+
+//     if (hasBg) {
+//         console.log(`[>] Background Frame '${bgImage}' mil gaya! PiP mode on.`);
+//         args.push("-thread_queue_size", "1024", "-loop", "1", "-framerate", "30", "-i", bgImage);
+//     } else {
+//         console.log(`[⚠️] Background Frame nahi mila. Normal mode mein chala raha hoon.`);
+//     }
+
+//     if (hasAudio) {
+//         console.log(`[>] Custom audio mil gaya. Original awaaz mute ki ja rahi hai.`);
+//         args.push("-thread_queue_size", "1024", "-stream_loop", "-1", "-i", audioFile);
+//     }
+
+//     let filterComplex = "";
+    
+//     if (hasBg) {
+//         filterComplex += `[0:v]scale=1064:565,boxblur=${blurAmount}[pip]; [1:v][pip]overlay=0:250:shortest=1,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[outv]`;
+//     } else {
+//         filterComplex += `[0:v]scale=1280:720,boxblur=${blurAmount},format=yuv420p[outv]`;
+//     }
+
+//     args.push("-filter_complex", filterComplex);
+//     args.push("-map", "[outv]");
+
+//     if (hasAudio) {
+//         let audioIndex = hasBg ? 2 : 1;
+//         args.push("-map", `${audioIndex}:a:0`);
+//     } else {
+//         args.push("-map", "0:a:0");
+//     }
+
+//     args.push(
+//         "-c:v", "libx264", 
+//         "-preset", "ultrafast", 
+//         "-c:a", "aac", 
+//         "-b:a", "128k", 
+//         "-t", duration, 
+//         outputVid
+//     );
+
+//     try {
+//         console.log(`[>] Executing FFmpeg Fast-Edit PiP Engine...`);
+//         const result = spawnSync('ffmpeg', args, { stdio: 'pipe' });
+        
+//         if (result.status !== 0) {
+//             console.log(`[❌] FFmpeg Internal Error Details:\n${result.stderr.toString()}`);
+//         }
+
+//         if (fs.existsSync(outputVid)) {
+//             const stats = fs.statSync(outputVid);
+//             if (stats.size > 1000) { 
+//                 console.log(`[✅ Worker 1 & 2] Video Edit, Frame aur Blur ke sath save ho gayi: ${outputVid}`);
+//                 return true;
+//             } else {
+//                 console.log(`[❌ Worker 1 & 2] Video file ban toh gayi lekin empty (0 bytes) hai. FFmpeg Crash!`);
+//             }
+//         }
+//     } catch (e) { 
+//         console.log(`[❌ Worker 1 & 2] FFmpeg processing code crash ho gaya!`); 
+//     }
+    
+//     return false;
+// }
 
 // ==========================================
 // 📤 WORKER 3: FACEBOOK UPLOAD
