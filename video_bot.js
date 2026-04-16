@@ -12,13 +12,14 @@ const TARGET_URL = process.env.TARGET_URL || 'https://dadocric.st/player.php?id=
 // 🔑 DUAL FACEBOOK TOKENS
 const FB_TOKEN_1 = process.env.FB_TOKEN_1 || '';
 const FB_TOKEN_2 = process.env.FB_TOKEN_2 || '';
+const FB_TOKEN_3 = process.env.FB_TOKEN_3 || '';
 const TOKEN_SELECTION = process.env.TOKEN_SELECTION || 'Dual'; 
 
 const TITLES_INPUT = process.env.TITLES_LIST || 'Live Match Today,,Watch Full Match DC vs GT';
 const DESCS_INPUT = process.env.DESCS_LIST || 'Watch the live action here';
 const HASHTAGS = process.env.HASHTAGS || '#IPL2026 #DCvsGT #CricketLovers #LiveMatch';
 
-const WAIT_TIME_MS = 300 * 1000; 
+const WAIT_TIME_MS = 500 * 1000; 
 const START_TIME = Date.now();
 const RESTART_TRIGGER_MS = (5 * 60 * 60 + 30 * 60) * 1000; 
 const END_TIME_LIMIT_MS = (5 * 60 * 60 + 50 * 60) * 1000; 
@@ -373,6 +374,7 @@ async function worker_3_upload(videoPath, thumbPath, title, desc) {
     let tokensToTry = [];
     if (TOKEN_SELECTION === 'Token1') tokensToTry = [FB_TOKEN_1];
     else if (TOKEN_SELECTION === 'Token2') tokensToTry = [FB_TOKEN_2];
+    else if (TOKEN_SELECTION === 'Token3') tokensToTry = [FB_TOKEN_3];
     else tokensToTry = [FB_TOKEN_1, FB_TOKEN_2]; 
 
     let activeToken = null;
