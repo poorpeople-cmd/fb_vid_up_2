@@ -1,3 +1,5 @@
+
+
 const puppeteer = require('puppeteer');
 const { spawnSync, execSync } = require('child_process');
 const fs = require('fs');
@@ -8,6 +10,10 @@ const axios = require('axios');
 // ⚙️ SETTINGS & ENVIRONMENT VARIABLES
 // ==========================================
 const TARGET_URL = process.env.TARGET_URL || 'https://dadocric.st/player.php?id=ptvsp';
+
+// 🌟 NAYA: Manual Inputs
+const MANUAL_M3U8 = process.env.M3U8_URL || '';
+const MANUAL_REFERER = process.env.REFERER_URL || '';
 
 // 🔑 TRIPLE FACEBOOK TOKENS
 const FB_TOKEN_1 = process.env.FB_TOKEN_1 || '';
@@ -61,6 +67,17 @@ function generateMetadata(clipNum) {
 // 🔍 WORKER 0: GET M3U8 LINK (PROXY FIRST LOGIC)
 // ==========================================
 async function getStreamData(isFirstBoot = false) {
+    // 🌟 NAYA LOGIC: Agar manual link diya gaya hai toh Puppeteer skip ho jayega
+    if (MANUAL_M3U8) {
+        console.log(`\n[🔍 STEP 1] Manual Mode Active! Puppeteer bypass kar raha hoon...`);
+        return {
+            url: MANUAL_M3U8,
+            referer: MANUAL_REFERER || TARGET_URL,
+            cookie: '',
+            expireTime: Date.now() + (24 * 60 * 60 * 1000) // 24 hours fake expiry
+        };
+    }
+
     console.log(`\n[🔍 STEP 1] Puppeteer Chrome Start kar raha hoon... (Strike: ${consecutiveLinkFails}/3)`);
     
     let browserArgs = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled', '--mute-audio'];
@@ -338,7 +355,16 @@ async function triggerNextRun() {
     if (!token || !repo) return;
     try {
         await axios.post(`https://api.github.com/repos/${repo}/actions/workflows/video_loop.yml/dispatches`, {
-            ref: branch, inputs: { target_url: TARGET_URL, titles_list: TITLES_INPUT, descs_list: DESCS_INPUT, hashtags: HASHTAGS, token_selection: TOKEN_SELECTION }
+            ref: branch, inputs: { 
+                target_url: TARGET_URL, 
+                titles_list: TITLES_INPUT, 
+                descs_list: DESCS_INPUT, 
+                hashtags: HASHTAGS, 
+                token_selection: TOKEN_SELECTION,
+                use_proxy: USE_PROXY,            // 🌟 Keeping proxy logic intact
+                m3u8_url: MANUAL_M3U8,           // 🌟 Passing manual link to next cycle
+                referer_url: MANUAL_REFERER      // 🌟 Passing referer to next cycle
+            }
         }, { headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' } });
     } catch (e) { console.log(`[❌ Relay Race] Trigger failed!`); }
 }
@@ -370,12 +396,17 @@ async function main() {
 
         if (streamData.expireTime - Date.now() < 120000) {
             console.log(`[🚨] Link expire hone wala hai! Naya link la raha hoon...`);
-            // Baad ki dafa proxy check override (First Boot = false)
-            let newData = await getStreamData(false);
-            if (newData) streamData = newData;
-            else { 
-                await new Promise(r => setTimeout(r, 60000)); 
-                continue; 
+            if (MANUAL_M3U8) {
+                // 🌟 NAYA LOGIC: Manual link ke liye bar bar reset karo taake loop chalta rahe
+                streamData.expireTime = Date.now() + (24 * 60 * 60 * 1000); 
+            } else {
+                // Baad ki dafa proxy check override (First Boot = false)
+                let newData = await getStreamData(false);
+                if (newData) streamData = newData;
+                else { 
+                    await new Promise(r => setTimeout(r, 60000)); 
+                    continue; 
+                }
             }
         }
 
@@ -411,6 +442,482 @@ async function main() {
 
 // Start The Bot
 main();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ====================== yeh code 100% correct hai , iss me direct m3u8 and reffere wala sytem add karty hai for football score808 website and ajsport.ch k liye ==========================================
+
+
+
+
+// const puppeteer = require('puppeteer');
+// const { spawnSync, execSync } = require('child_process');
+// const fs = require('fs');
+// const FormData = require('form-data');
+// const axios = require('axios'); 
+
+// // ==========================================
+// // ⚙️ SETTINGS & ENVIRONMENT VARIABLES
+// // ==========================================
+// const TARGET_URL = process.env.TARGET_URL || 'https://dadocric.st/player.php?id=ptvsp';
+
+// // 🔑 TRIPLE FACEBOOK TOKENS
+// const FB_TOKEN_1 = process.env.FB_TOKEN_1 || '';
+// const FB_TOKEN_2 = process.env.FB_TOKEN_2 || '';
+// const FB_TOKEN_3 = process.env.FB_TOKEN_3 || ''; 
+// const TOKEN_SELECTION = process.env.TOKEN_SELECTION || 'Dual'; 
+
+// // 🛡️ SMART PROXY SETTINGS
+// const USE_PROXY = process.env.USE_PROXY || 'No (Proxy OFF)';
+// const PROXY_IP = process.env.PROXY_IP || '';
+// const PROXY_PORT = process.env.PROXY_PORT || '';
+// const PROXY_USER = process.env.PROXY_USER || '';
+// const PROXY_PASS = process.env.PROXY_PASS || '';
+
+// const TITLES_INPUT = process.env.TITLES_LIST || 'Live Match Today,,Watch Full Match DC vs GT';
+// const DESCS_INPUT = process.env.DESCS_LIST || 'Watch the live action here';
+// const HASHTAGS = process.env.HASHTAGS || '#IPL2026 #DCvsGT #CricketLovers #LiveMatch';
+
+// const START_TIME = Date.now();
+// const RESTART_TRIGGER_MS = (5 * 60 * 60 + 30 * 60) * 1000; 
+// const END_TIME_LIMIT_MS = (5 * 60 * 60 + 50 * 60) * 1000; 
+
+// let consecutiveLinkFails = 0;
+// let clipCounter = 1;
+
+// function formatPKT(timestampMs = Date.now()) {
+//     return new Date(timestampMs).toLocaleString('en-US', {
+//         timeZone: 'Asia/Karachi', hour12: true, year: 'numeric', month: 'short',
+//         day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+//     }) + " PKT";
+// }
+
+// // ==========================================
+// // 🧠 METADATA GENERATOR
+// // ==========================================
+// function generateMetadata(clipNum) {
+//     console.log(`\n[🧠 Metadata] Cycle #${clipNum} ke liye naya Title aur Description ban raha hai...`);
+//     const titles = TITLES_INPUT.split(',,').map(t => t.trim()).filter(t => t);
+//     const descs = DESCS_INPUT.split(',,').map(d => d.trim()).filter(d => d);
+//     const title = titles.length ? titles[Math.floor(Math.random() * titles.length)] : "Live Match Today";
+//     const descBody = descs.length ? descs[Math.floor(Math.random() * descs.length)] : "Watch the live action here!";
+//     const emojis = ["🔥", "🏏", "⚡", "🏆", "💥", "😱", "📺", "🚀"].sort(() => 0.5 - Math.random()).slice(0, 3);
+//     const tags = HASHTAGS.split(' ').sort(() => 0.5 - Math.random()).slice(0, 4).join(' ');
+    
+//     const finalTitle = title.substring(0, 240); 
+//     const finalDesc = `${finalTitle} ${emojis.join(' ')}\n\n${descBody}\n\n⏱️ Update: ${formatPKT()}\n👇 Watch Full Match Link in First Comment!\n\n${tags}`;
+//     return { title: finalTitle, desc: finalDesc };
+// }
+
+// // ==========================================
+// // 🔍 WORKER 0: GET M3U8 LINK (PROXY FIRST LOGIC)
+// // ==========================================
+// async function getStreamData(isFirstBoot = false) {
+//     console.log(`\n[🔍 STEP 1] Puppeteer Chrome Start kar raha hoon... (Strike: ${consecutiveLinkFails}/3)`);
+    
+//     let browserArgs = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled', '--mute-audio'];
+    
+//     // 🛡️ SMART PROXY LOGIC
+//     let useProxyForThisRun = false;
+//     if (USE_PROXY === 'Yes (Proxy ON)') {
+//         useProxyForThisRun = true;
+//     } else if (USE_PROXY === 'Only First Time (Proxy FIRST)' && isFirstBoot) {
+//         useProxyForThisRun = true;
+//     }
+
+//     if (useProxyForThisRun && PROXY_IP && PROXY_PORT) {
+//         browserArgs.push(`--proxy-server=http://${PROXY_IP}:${PROXY_PORT}`);
+//         console.log(`  [🛡️] Proxy Mode: ON (${PROXY_IP})`);
+//     } else {
+//         console.log(`  [🚀] Proxy Mode: OFF (Direct Connection)`);
+//     }
+
+//     const browser = await puppeteer.launch({ headless: true, args: browserArgs });
+//     const page = await browser.newPage();
+
+//     if (useProxyForThisRun && PROXY_USER && PROXY_PASS) {
+//         await page.authenticate({ username: PROXY_USER, password: PROXY_PASS });
+//     }
+    
+//     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+//     let streamData = null;
+//     page.on('request', (request) => {
+//         const url = request.url();
+//         if (url.includes('.m3u8')) {
+//             const urlObj = new URL(url);
+//             const expires = urlObj.searchParams.get('expires') || urlObj.searchParams.get('e') || urlObj.searchParams.get('exp');
+//             let expireMs = expires ? parseInt(expires) * 1000 : Date.now() + (60 * 60 * 1000);
+//             streamData = {
+//                 url: url, referer: request.headers()['referer'] || TARGET_URL,
+//                 cookie: request.headers()['cookie'] || '', expireTime: expireMs
+//             };
+//         }
+//     });
+
+//     try {
+//         console.log(`[🌐] Target URL par ja raha hoon...`);
+//         await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
+//         await page.click('body').catch(() => {});
+        
+//         for (let i = 1; i <= 3; i++) {
+//             await new Promise(r => setTimeout(r, 5000)); 
+//             if (streamData) break; 
+//         }
+//     } catch (e) { 
+//         console.log(`[❌ ERROR] Page load nahi ho saka.`); 
+//     }
+    
+//     await browser.close();
+
+//     if (streamData) {
+//         consecutiveLinkFails = 0; 
+//         console.log(`[✅ BINGO] M3U8 Link pakar liya gaya! Expiry: ${formatPKT(streamData.expireTime)}`);
+//         return streamData;
+//     } else {
+//         consecutiveLinkFails++;
+//         console.log(`[🚨 WARNING] Link nahi mila. Strike: ${consecutiveLinkFails}/3`);
+//         if (consecutiveLinkFails >= 3) {
+//             console.log(`[🛑 FATAL] 3 baar consecutive fail! Bot stop.`);
+//             process.exit(1); 
+//         }
+//         return null;
+//     }
+// }
+
+// // ==========================================
+// // 📸 WORKER 0.5: GENERATE THUMBNAIL
+// // ==========================================
+// async function worker_0_5_generate_thumbnail(data, titleText, outputImagePath) {
+//     console.log(`\n[🎨 Worker 0.5] Puppeteer se HD Thumbnail bana raha hoon...`);
+//     const rawFrame = 'temp_raw_frame.jpg';
+//     try {
+//         const headersCmd = `User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\nReferer: ${data.referer}\r\nCookie: ${data.cookie}\r\n`;
+//         execSync(`ffmpeg -y -headers "${headersCmd}" -i "${data.url}" -vframes 1 -q:v 2 ${rawFrame}`, { stdio: 'ignore' });
+//     } catch (e) { return false; }
+
+//     if (!fs.existsSync(rawFrame)) return false;
+//     const b64Image = "data:image/jpeg;base64," + fs.readFileSync(rawFrame).toString('base64');
+    
+//     const htmlCode = `
+//         <!DOCTYPE html><html><head>
+//         <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700;900&display=swap" rel="stylesheet">
+//         <style>
+//             body { margin: 0; width: 1280px; height: 720px; background: #0f0f0f; font-family: 'Roboto', sans-serif; color: white; display: flex; flex-direction: column; overflow: hidden; }
+//             .header { height: 100px; display: flex; align-items: center; padding: 0 40px; justify-content: space-between; z-index: 10; }
+//             .logo { font-size: 50px; font-weight: 900; letter-spacing: 1px; text-shadow: 0 0 10px rgba(255,255,255,0.8); }
+//             .live-badge { border: 4px solid #cc0000; border-radius: 12px; padding: 5px 20px; font-size: 40px; font-weight: 700; display: flex; gap: 10px; }
+//             .hero-container { position: relative; width: 100%; height: 440px; }
+//             .hero-img { width: 100%; height: 100%; object-fit: cover; filter: blur(5px); opacity: 0.6; }
+//             .pip-img { position: absolute; top: 20px; right: 40px; width: 45%; border: 6px solid white; box-shadow: -15px 15px 30px rgba(0,0,0,0.8); }
+//             .text-container { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px 40px; }
+//             .main-title { font-size: 70px; font-weight: 900; line-height: 1.1; text-shadow: 6px 6px 15px rgba(0,0,0,0.9); }
+//             .live-text { color: #cc0000; }
+//         </style>
+//         </head><body>
+//             <div class="header"><div class="logo">SPORTSHUB</div><div class="live-badge"><span style="color:#cc0000">●</span> LIVE</div></div>
+//             <div class="hero-container"><img src="${b64Image}" class="hero-img"><img src="${b64Image}" class="pip-img"></div>
+//             <div class="text-container"><div class="main-title"><span class="live-text">LIVE NOW: </span>${titleText}</div></div>
+//         </body></html>`;
+
+//     const browser = await puppeteer.launch({ headless: true, defaultViewport: { width: 1280, height: 720 }, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+//     const page = await browser.newPage();
+//     await page.setContent(htmlCode);
+//     await page.screenshot({ path: outputImagePath });
+//     await browser.close();
+//     if (fs.existsSync(rawFrame)) fs.unlinkSync(rawFrame); 
+//     console.log(`[✅ Worker 0.5] Thumbnail Ready!`);
+//     return true;
+// }
+
+// // ==========================================
+// // 🎥 WORKER 1 & 2: CAPTURE, EDIT & MERGE
+// // ==========================================
+// async function worker_1_2_capture_and_edit(data, outputVid) {
+//     console.log(`\n[🎬 Worker 1 & 2] Stream capture aur Merging shuru ho rahi hai...`);
+//     const headersCmd = `User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\nReferer: ${data.referer}\r\nCookie: ${data.cookie}\r\n`;
+    
+//     const audioFile = "marya_live.mp3";
+//     const bgImage = "website_frame.png";
+//     const staticVideo = "main_video.mp4"; 
+    
+//     // 🎯 RANDOM 1: Capture video duration randomly between 10 to 25 seconds
+//     const random1_duration = Math.floor(Math.random() * (25 - 10 + 1)) + 10;
+//     const durationStr = random1_duration.toString(); 
+    
+//     const blurAmount = "20:5"; 
+
+//     const hasBg = fs.existsSync(bgImage);
+//     const hasAudio = fs.existsSync(audioFile);
+//     const hasMainVideo = fs.existsSync(staticVideo);
+
+//     const tempDynVideo = `temp_dyn_${Date.now()}.mp4`; 
+
+//     console.log(`[>] Step A: ${random1_duration} seconds ki live clip tayyar kar raha hoon (Random1)...`);
+//     let args1 = ["-y", "-thread_queue_size", "1024", "-headers", headersCmd, "-i", data.url];
+
+//     if (hasBg) args1.push("-thread_queue_size", "1024", "-loop", "1", "-framerate", "30", "-i", bgImage);
+//     if (hasAudio) args1.push("-thread_queue_size", "1024", "-stream_loop", "-1", "-i", audioFile);
+
+//     let filterComplex1 = "";
+//     if (hasBg) filterComplex1 += `[0:v]scale=1064:565,boxblur=${blurAmount}[pip]; [1:v][pip]overlay=0:250:shortest=1,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[outv]`;
+//     else filterComplex1 += `[0:v]scale=1280:720,boxblur=${blurAmount},format=yuv420p[outv]`;
+
+//     args1.push("-filter_complex", filterComplex1, "-map", "[outv]");
+
+//     if (hasAudio) {
+//         let audioIndex = hasBg ? 2 : 1;
+//         args1.push("-map", `${audioIndex}:a:0`);
+//     } else args1.push("-map", "0:a:0");
+
+//     args1.push("-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-b:a", "128k", "-t", durationStr, tempDynVideo);
+
+//     try {
+//         const result1 = spawnSync('ffmpeg', args1, { stdio: 'pipe' });
+        
+//         if (fs.existsSync(tempDynVideo) && fs.statSync(tempDynVideo).size > 1000) {
+//             console.log(`[✅] Step A Done! ${random1_duration} sec ki clip ban gayi.`);
+            
+//             if (hasMainVideo) {
+//                 console.log(`[>] Step B: 'main_video.mp4' ke sath merge kar raha hoon...`);
+//                 let args2 = [
+//                     "-y", "-i", tempDynVideo, "-i", staticVideo,
+//                     "-filter_complex", "[0:v]scale=1280:720,setsar=1,fps=30,format=yuv420p[v0]; [0:a]aformat=sample_rates=44100:channel_layouts=stereo[a0]; [1:v]scale=1280:720,setsar=1,fps=30,format=yuv420p[v1]; [1:a]aformat=sample_rates=44100:channel_layouts=stereo[a1]; [v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
+//                     "-map", "[outv]", "-map", "[outa]", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-b:a", "128k", outputVid
+//                 ];
+
+//                 spawnSync('ffmpeg', args2, { stdio: 'pipe' });
+//                 fs.unlinkSync(tempDynVideo); 
+
+//                 if (fs.existsSync(outputVid) && fs.statSync(outputVid).size > 1000) {
+//                     console.log(`[✅ Worker 1 & 2] Merging SUCCESS! Final Video Ready.`);
+//                     return true;
+//                 }
+//             } else {
+//                 fs.renameSync(tempDynVideo, outputVid); 
+//                 return true;
+//             }
+//         }
+//     } catch (e) { console.log(`[❌ Worker 1 & 2] FFmpeg process fail!`); }
+    
+//     return false;
+// }
+
+// // ==========================================
+// // 📤 WORKER 3: FACEBOOK UPLOAD
+// // ==========================================
+// async function checkFacebookToken(token) {
+//     const res = await axios.get(`https://graph.facebook.com/v18.0/me?access_token=${token}&fields=id,name`);
+//     return { pageId: res.data.id, pageName: res.data.name };
+// }
+
+// async function worker_3_upload(videoPath, thumbPath, title, desc) {
+//     console.log(`\n[📤 Worker 3] Facebook Upload (Manual Mode: ${TOKEN_SELECTION})`);
+    
+//     let tokensToTry = [];
+//     if (TOKEN_SELECTION === 'Token1') tokensToTry = [FB_TOKEN_1];
+//     else if (TOKEN_SELECTION === 'Token2') tokensToTry = [FB_TOKEN_2];
+//     else if (TOKEN_SELECTION === 'Token3') tokensToTry = [FB_TOKEN_3];
+//     else if (TOKEN_SELECTION === 'Dual') tokensToTry = [FB_TOKEN_1, FB_TOKEN_2];
+//     else if (TOKEN_SELECTION === 'Triple' || TOKEN_SELECTION === 'All') tokensToTry = [FB_TOKEN_1, FB_TOKEN_2, FB_TOKEN_3];
+//     else tokensToTry = [FB_TOKEN_1, FB_TOKEN_2, FB_TOKEN_3]; 
+
+//     let activeToken = null;
+//     let pageId = null;
+
+//     for (let token of tokensToTry) {
+//         if (!token) continue;
+//         try {
+//             const info = await checkFacebookToken(token);
+//             activeToken = token;
+//             pageId = info.pageId;
+//             console.log(`[✅ FB Auth] Valid Token Found! Page: ${info.pageName}`);
+//             break; 
+//         } catch (e) {
+//             console.log(`[⚠️] Token failed. Checking next...`);
+//         }
+//     }
+
+//     if (!activeToken) {
+//         console.log(`[❌ FATAL] Koi valid token nahi mila!`);
+//         return false;
+//     }
+
+//     try {
+//         const form = new FormData();
+//         form.append('access_token', activeToken);
+//         form.append('title', title);
+//         form.append('description', desc);
+//         form.append('source', fs.createReadStream(videoPath));
+//         if (fs.existsSync(thumbPath)) form.append('thumb', fs.createReadStream(thumbPath));
+
+//         console.log(`[>] Video Upload ho rahi hai...`);
+//         const uploadRes = await axios.post(`https://graph-video.facebook.com/v18.0/${pageId}/videos`, form, { headers: form.getHeaders() });
+//         const videoId = uploadRes.data.id;
+//         console.log(`[✅ Worker 3] Video Successfully Uploaded! (Post ID: ${videoId})`);
+
+//         // 🎯 RANDOM 3: Wait randomly between 20 to 60 seconds after upload for FB processing
+//         const random3_wait = Math.floor(Math.random() * (60 - 20 + 1)) + 20;
+//         console.log(`[⏳] ${random3_wait} second ka wait FB ki processing poori hone ke liye (Random3)...`);
+//         await new Promise(r => setTimeout(r, random3_wait * 1000));
+        
+//         console.log(`\n[💬] Promotional Comment post karne laga hoon...`);
+//         const commentForm = new FormData();
+//         commentForm.append('access_token', activeToken);
+//         commentForm.append('message', '📺 Watch Full Match Without Buffering Here: https://bulbul4u-live.xyz');
+        
+//         if (fs.existsSync("comment_image.jpeg")) {
+//             commentForm.append('source', fs.createReadStream("comment_image.jpeg"));
+//         }
+
+//         await axios.post(`https://graph.facebook.com/v18.0/${videoId}/comments`, commentForm, { headers: commentForm.getHeaders() });
+//         console.log(`[✅ Worker 3] Comment Successfully Post Ho Gaya!`);
+//         return true;
+//     } catch (e) {
+//         console.log(`[❌ Worker 3] Upload Crash: ${e.message}`);
+//         return false;
+//     }
+// }
+
+// // ==========================================
+// // 🚀 MAIN HYBRID LOOP (THE BRAIN)
+// // ==========================================
+// async function triggerNextRun() {
+//     console.log(`\n[🔄 AUTO-RESTART] GitHub API ke zariye naya bot chala raha hoon...`);
+//     const token = process.env.GH_PAT;
+//     const repo = process.env.GITHUB_REPOSITORY;
+//     const branch = process.env.GITHUB_REF_NAME || 'main';
+//     if (!token || !repo) return;
+//     try {
+//         await axios.post(`https://api.github.com/repos/${repo}/actions/workflows/video_loop.yml/dispatches`, {
+//             ref: branch, inputs: { target_url: TARGET_URL, titles_list: TITLES_INPUT, descs_list: DESCS_INPUT, hashtags: HASHTAGS, token_selection: TOKEN_SELECTION }
+//         }, { headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' } });
+//     } catch (e) { console.log(`[❌ Relay Race] Trigger failed!`); }
+// }
+
+// async function main() {
+//     console.log("\n==================================================");
+//     console.log(`   🚀 ULTIMATE HYBRID VIDEO BOT - MODE: ${TOKEN_SELECTION}`);
+//     console.log(`   ⏰ STARTED AT: ${formatPKT()}`);
+//     console.log("==================================================");
+
+//     // Pehli dafa (First Boot = true)
+//     let streamData = await getStreamData(true);
+//     if (!streamData) return;
+//     let nextRunTriggered = false;
+
+//     while (true) {
+//         const elapsedTimeMs = Date.now() - START_TIME;
+        
+//         console.log(`\n--------------------------------------------------`);
+//         console.log(`--- 🔄 STARTING VIDEO CYCLE #${clipCounter} ---`);
+//         console.log(`  [-] Bot Uptime: ${Math.floor(elapsedTimeMs / 60000)} minutes`);
+//         console.log(`--------------------------------------------------`);
+
+//         if (elapsedTimeMs > RESTART_TRIGGER_MS && !nextRunTriggered) { await triggerNextRun(); nextRunTriggered = true; }
+//         if (elapsedTimeMs > END_TIME_LIMIT_MS) {
+//             console.log(`\n[🛑 System] 6 Ghante ki limit poori. Graceful exit.`);
+//             process.exit(0);
+//         }
+
+//         if (streamData.expireTime - Date.now() < 120000) {
+//             console.log(`[🚨] Link expire hone wala hai! Naya link la raha hoon...`);
+//             // Baad ki dafa proxy check override (First Boot = false)
+//             let newData = await getStreamData(false);
+//             if (newData) streamData = newData;
+//             else { 
+//                 await new Promise(r => setTimeout(r, 60000)); 
+//                 continue; 
+//             }
+//         }
+
+//         const meta = generateMetadata(clipCounter);
+//         const thumbFile = `studio_thumb_${clipCounter}.png`;
+//         const finalVidFile = `final_${clipCounter}.mp4`;
+
+//         console.log(`\n[⚡ Flow] Worker Pipeline Start kar raha hoon...`);
+//         if (await worker_0_5_generate_thumbnail(streamData, meta.title, thumbFile)) {
+//             if (await worker_1_2_capture_and_edit(streamData, finalVidFile)) {
+                
+//                 // 🎯 RANDOM 2: Wait randomly between 5 to 30 seconds before uploading
+//                 const random2_wait = Math.floor(Math.random() * (30 - 5 + 1)) + 5;
+//                 console.log(`\n[⏳] Video Ready! Upload shuru karne se pehle ${random2_wait} seconds wait kar raha hoon (Random2)...`);
+//                 await new Promise(r => setTimeout(r, random2_wait * 1000));
+
+//                 await worker_3_upload(finalVidFile, thumbFile, meta.title, meta.desc);
+//             }
+//         }
+
+//         console.log(`\n[🧹 Cleanup] Temporary files delete kar raha hoon...`);
+//         [thumbFile, finalVidFile].forEach(f => { 
+//             if (fs.existsSync(f)) { fs.unlinkSync(f); console.log(`  [-] Deleted: ${f}`); } 
+//         });
+        
+//         // 🎯 RANDOM 4: Wait randomly between 5 mins (300s) to 15 mins (900s) before next cycle
+//         const random4_wait = Math.floor(Math.random() * (900 - 300 + 1)) + 300;
+//         console.log(`\n[⏳ Cycle End] Cycle #${clipCounter} Mukammal! Aglay round tak ${random4_wait} seconds (approx ${Math.round(random4_wait/60)} mins) wait kar raha hoon (Random4)...`);
+//         clipCounter++;
+//         await new Promise(r => setTimeout(r, random4_wait * 1000));
+//     }
+// }
+
+// // Start The Bot
+// main();
 
 
 
